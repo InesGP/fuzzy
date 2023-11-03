@@ -1,0 +1,41 @@
+diff --git a/.ci/pytorch/build.sh b/.ci/pytorch/build.sh
+index b53b4675df6..aac7c07aea9 100755
+--- a/.ci/pytorch/build.sh
++++ b/.ci/pytorch/build.sh
+@@ -164,6 +164,12 @@ if [[ "${BUILD_ENVIRONMENT}" == *clang* ]]; then
+   export CXX=clang++
+ fi
+ 
++if [[ "${BUILD_ENVIRONMENT}" == *verificarlo* ]]; then
++  export CC=verificarlo-c
++  export CXX=verificarlo-c++
++  export VFC_BACKENDS=libinterflop_ieee.so # So that cmake checks pass
++fi
++
+ if [[ "$BUILD_ENVIRONMENT" == *-clang*-asan* ]]; then
+   export LDSHARED="clang --shared"
+   export USE_CUDA=0
+@@ -220,7 +226,8 @@ else
+     # set only when building other architectures
+     # or building non-XLA tests.
+     if [[ "$BUILD_ENVIRONMENT" != *rocm*  &&
+-          "$BUILD_ENVIRONMENT" != *xla* ]]; then
++          "$BUILD_ENVIRONMENT" != *xla* &&
++         "$BUILD_ENVIRONMENT" != *verificarlo* ]]; then
+       WERROR=1 python setup.py bdist_wheel
+     else
+       python setup.py bdist_wheel
+diff --git a/.ci/pytorch/common_utils.sh b/.ci/pytorch/common_utils.sh
+index 7894c14b254..7902d9a7c29 100644
+--- a/.ci/pytorch/common_utils.sh
++++ b/.ci/pytorch/common_utils.sh
+@@ -42,7 +42,7 @@ declare -f -t trap_add
+ function assert_git_not_dirty() {
+     # TODO: we should add an option to `build_amd.py` that reverts the repo to
+     #       an unmodified state.
+-    if [[ "$BUILD_ENVIRONMENT" != *rocm* ]] && [[ "$BUILD_ENVIRONMENT" != *xla* ]] ; then
++    if [[ "$BUILD_ENVIRONMENT" != *rocm* ]] && [[ "$BUILD_ENVIRONMENT" != *xla* && "$BUILD_ENVIRONMENT" != *verificarlo* ]] ; then
+         git_status=$(git status --porcelain)
+         if [[ $git_status ]]; then
+             echo "Build left local git repository checkout dirty"
+
