@@ -6,12 +6,12 @@ ARG UBUNTU_VERSION=20.04
 ENV DEBIAN_FRONTEND noninteractive
 
 # Install common dependencies (so that this step can be cached separately)
-ADD resources/pytorch/build-deps-installers/install_base.sh install_base.sh
+ADD resources/pytorch/build-deps-installers/install_base_new.sh install_base.sh
 RUN bash ./install_base.sh && rm install_base.sh
 
 # Install clang
 ARG LLVMDEV=yes
-ARG CLANG_VERSION=7
+ARG CLANG_VERSION=9
 ADD resources/pytorch/build-deps-installers/install_clang.sh install_clang.sh
 RUN bash ./install_clang.sh && rm install_clang.sh
 
@@ -39,7 +39,7 @@ ENV INSTALLED_PROTOBUF ${PROTOBUF}
 
 # Install database packages like LMDB and LevelDB
 ARG DB=yes
-ADD resources_new/pytorch/build-deps-installers/install_db.sh install_db.sh
+ADD resources/pytorch/build-deps-installers/install_db.sh install_db.sh
 RUN if [ -n "${DB}" ]; then bash ./install_db.sh; fi
 RUN rm install_db.sh
 ENV INSTALLED_DB ${DB}
@@ -69,39 +69,31 @@ WORKDIR /var/lib/jenkins/workspace
 RUN git config --global http.postBuffer 524288000  && git clone https://github.com/pytorch/pytorch . && \
     git checkout v2.1.0  && \
     git submodule sync && git submodule update -q --init --recursive
-#git checkout 490d41aaa61a9c0b12637e40cec066bf0e9515f3
+
 
 # Patch build script
-ADD resources/pytorch/build_script_patch_new .
-RUN git apply build_script_patch_new
+ADD resources/pytorch/build_script_patch_new build_script_patch
+RUN git apply build_script_patch
 
 # Disable BLAS
-ADD resources/pytorch/patch_disabling_blas_new .
-RUN git apply --ignore-space-change patch_disabling_blas_new
+ADD resources/pytorch/patch_disabling_blas_new patch_disabling_blas
+RUN git apply --ignore-space-change patch_disabling_blas
 
 # Setup function instrumentation
-ADD resources/pytorch/script_setting_up_function_instrumentation .
+ADD resources/pytorch/script_setting_up_function_instrumentation_new script_setting_up_function_instrumentation
 RUN bash script_setting_up_function_instrumentation
+
+# Setup instrumentation of XNNPACK
+ADD resources/pytorch/build-local.sh third_party/XNNPACK/scripts/build-local.sh
 
 ENV IN_CIRCLECI=1 \
     BUILD_ENVIRONMENT=pytorch-linux-bionic-py3.8-verificarlo-build
 
-ARG MAX_JOBS=1
-
-#install specific version of cmake
-#ENV CMAKE_VERSION="3.24.1"
-#RUN wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-Linux-x86_64.sh -q -O /tmp/cmake-#install.sh \
-#    && chmod u+x /tmp/cmake-install.sh \
-#    && sudo mkdir /opt/cmake-${CMAKE_VERSION} \
-#    && sudo /tmp/cmake-install.sh --skip-license --prefix=/opt/cmake-${CMAKE_VERSION} \
-#    && rm /tmp/cmake-install.sh \
-#    && sudo ln -s /opt/cmake-${CMAKE_VERSION}/bin/* /usr/local/bin
+ARG MAX_JOBS=7
 
 
 RUN .ci/pytorch/build.sh && \
     find . -type f -name "*.a" -or -name "*.o" -or -name "*.ll" -delete
-
-RUN sudo apt-get -y update && sudo apt-get -y install libomp5
 
 
 
@@ -115,7 +107,7 @@ RUN     apt-get update && \
         wget -q "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh" && \
         chmod +x ./Miniconda3-latest-Linux-x86_64.sh && \
         ./Miniconda3-latest-Linux-x86_64.sh -b -f -p "/opt/conda" && \
-        /opt/conda/bin/conda install -y python="3.8" sympy numpy=1.24 pyyaml mkl mkl-include setuptools \
+        /opt/conda/bin/conda install -y python="3.8" typing_extensions sympy numpy=1.24 pyyaml mkl mkl-include setuptools \
                                         cffi typing typing_extensions future six dataclasses && \
         rm -rf /var/lib/apt/lists/* Miniconda3-latest-Linux-x86_64.sh
         #upgrade numpy from 1.18.5
@@ -135,7 +127,7 @@ COPY    --from=builder \
 
 ENV     VFC_BACKENDS="libinterflop_mca.so"
 
-ADD     resources/pytorch/test_fuzzy_pytorch.sh .
-RUN     bash ./test_fuzzy_pytorch.sh && rm test_fuzzy_pytorch.sh
+ADD     resources/test_fuzzy_pytorch.sh .
+#RUN     bash ./test_fuzzy_pytorch.sh && rm test_fuzzy_pytorch.sh
 
 CMD ["bash"]

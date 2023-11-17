@@ -1,8 +1,8 @@
 diff --git a/.ci/pytorch/build.sh b/.ci/pytorch/build.sh
-index b53b4675df6..aac7c07aea9 100755
+index b53b4675df6..74efb85c579 100755
 --- a/.ci/pytorch/build.sh
 +++ b/.ci/pytorch/build.sh
-@@ -164,6 +164,12 @@ if [[ "${BUILD_ENVIRONMENT}" == *clang* ]]; then
+@@ -164,6 +164,13 @@ if [[ "${BUILD_ENVIRONMENT}" == *clang* ]]; then
    export CXX=clang++
  fi
  
@@ -12,21 +12,22 @@ index b53b4675df6..aac7c07aea9 100755
 +  export VFC_BACKENDS=libinterflop_ieee.so # So that cmake checks pass
 +fi
 +
++
  if [[ "$BUILD_ENVIRONMENT" == *-clang*-asan* ]]; then
    export LDSHARED="clang --shared"
    export USE_CUDA=0
-@@ -220,7 +226,8 @@ else
+@@ -220,7 +227,8 @@ else
      # set only when building other architectures
      # or building non-XLA tests.
      if [[ "$BUILD_ENVIRONMENT" != *rocm*  &&
 -          "$BUILD_ENVIRONMENT" != *xla* ]]; then
 +          "$BUILD_ENVIRONMENT" != *xla* &&
-+         "$BUILD_ENVIRONMENT" != *verificarlo* ]]; then
++          "$BUILD_ENVIRONMENT" != *verificarlo* ]]; then
        WERROR=1 python setup.py bdist_wheel
      else
        python setup.py bdist_wheel
 diff --git a/.ci/pytorch/common_utils.sh b/.ci/pytorch/common_utils.sh
-index 7894c14b254..7902d9a7c29 100644
+index 7894c14b254..e008b0f618e 100644
 --- a/.ci/pytorch/common_utils.sh
 +++ b/.ci/pytorch/common_utils.sh
 @@ -42,7 +42,7 @@ declare -f -t trap_add
@@ -38,4 +39,16 @@ index 7894c14b254..7902d9a7c29 100644
          git_status=$(git status --porcelain)
          if [[ $git_status ]]; then
              echo "Build left local git repository checkout dirty"
-
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3a48eaf4e29..2c9d94763ab 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -29,6 +29,8 @@ else()
+ endif()
+ 
+ set(CMAKE_INSTALL_MESSAGE NEVER)
++set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
++set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+ 
+ # check and set CMAKE_CXX_STANDARD
+ string(FIND "${CMAKE_CXX_FLAGS}" "-std=c++" env_cxx_standard)

@@ -1,23 +1,21 @@
 diff --git a/.ci/pytorch/build.sh b/.ci/pytorch/build.sh
-index aac7c07aea9..35563db437d 100755
+index 74efb85c579..1d77220bcb8 100755
 --- a/.ci/pytorch/build.sh
 +++ b/.ci/pytorch/build.sh
-@@ -6,6 +6,13 @@ set -ex
+@@ -5,6 +5,11 @@ set -ex
+ # Required environment variable: $BUILD_ENVIRONMENT
  # (This is set by default in the Docker images we build, so you don't
  # need to set it yourself.
- 
 +if [[ -n "$IN_CIRCLECI" ]]; then
 +  # Download customized sccache
 +  sudo curl --retry 3 http://repo.radeon.com/misc/.sccache_amd/sccache -o /opt/cache/bin/sccache
 +  sudo chmod 755 /opt/cache/bin/sccache
 +fi
-+
-+
+ 
  # shellcheck source=./common.sh
  source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
- # shellcheck source=./common-build.sh
-@@ -230,6 +237,8 @@ else
-          "$BUILD_ENVIRONMENT" != *verificarlo* ]]; then
+@@ -231,6 +236,8 @@ else
+           "$BUILD_ENVIRONMENT" != *verificarlo* ]]; then
        WERROR=1 python setup.py bdist_wheel
      else
 +      python setup.py build --cmake-only
@@ -25,3 +23,4 @@ index aac7c07aea9..35563db437d 100755
        python setup.py bdist_wheel
      fi
      pip_install_whl "$(echo dist/*.whl)"
+

@@ -82,7 +82,11 @@ if [ -n "$ANACONDA_PYTHON_VERSION" ]; then
   if [ "$ANACONDA_PYTHON_VERSION" = "3.8" ]; then
     # DO NOT install typing if installing python-3.8, since its part of python-3.8 core packages
     # Install llvm-8 as it is required to compile llvmlite-0.30.0 from source
-    conda_install numpy=1.18.5 pyyaml mkl mkl-include setuptools cffi future six llvmdev=8.0.0 dataclasses cmake
+    conda config --set remote_max_retries 4 
+    conda config --set remote_connect_timeout_secs 20
+    conda config --set ssl_verify no
+    conda_install numpy=1.18.5 pyyaml mkl mkl-include setuptools -vv
+    conda_install cffi future six llvmdev=8.0.0 dataclasses cmake -vv
   else
     conda_install numpy=1.18.5 pyyaml mkl mkl-include setuptools cffi typing future six dataclasses
   fi
