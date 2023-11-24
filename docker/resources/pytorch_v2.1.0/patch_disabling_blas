@@ -1,0 +1,13 @@
+diff --git a/.ci/pytorch/build.sh b/.ci/pytorch/build.sh
+index 83ac99b1042..61c82f6bb35 100755
+--- a/.ci/pytorch/build.sh
++++ b/.ci/pytorch/build.sh
+@@ -242,6 +242,7 @@ else
+           "$BUILD_ENVIRONMENT" != *verificarlo* ]]; then
+       WERROR=1 python setup.py bdist_wheel
+     else
++      python setup.py build --cmake-only
+       python setup.py bdist_wheel
+     fi
+     pip_install_whl "$(echo dist/*.whl)"
+

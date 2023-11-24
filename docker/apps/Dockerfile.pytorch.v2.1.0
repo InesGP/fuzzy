@@ -6,53 +6,53 @@ ARG UBUNTU_VERSION=20.04
 ENV DEBIAN_FRONTEND noninteractive
 
 # Install common dependencies (so that this step can be cached separately)
-ADD resources/pytorch/build-deps-installers/install_base_new.sh install_base.sh
+ADD resources/pytorch_v2.1.0/build-deps-installers/install_base.sh install_base.sh
 RUN bash ./install_base.sh && rm install_base.sh
 
 # Install clang
 ARG LLVMDEV=yes
 ARG CLANG_VERSION=9
-ADD resources/pytorch/build-deps-installers/install_clang.sh install_clang.sh
+ADD resources/pytorch_v2.1.0/build-deps-installers/install_clang.sh install_clang.sh
 RUN bash ./install_clang.sh && rm install_clang.sh
 
 # Install user
-ADD resources/pytorch/build-deps-installers/install_user.sh install_user.sh
+ADD resources/pytorch_v2.1.0/build-deps-installers/install_user.sh install_user.sh
 RUN bash ./install_user.sh && rm install_user.sh
 
 # Install conda
 ENV PATH /opt/conda/bin:$PATH
 ARG ANACONDA_PYTHON_VERSION=3.8
-ADD resources/pytorch/build-deps-installers/install_conda_new.sh install_conda.sh
+ADD resources/pytorch_v2.1.0/build-deps-installers/install_conda.sh install_conda.sh
 RUN bash ./install_conda.sh && rm install_conda.sh
 
 # Install Verificarlo
 ARG VERIFICARLO_VERSION=github
-ADD resources/pytorch/build-deps-installers/install_verificarlo_new.sh install_verificarlo.sh
+ADD resources/pytorch_v2.1.0/build-deps-installers/install_verificarlo2.sh install_verificarlo.sh
 RUN bash ./install_verificarlo.sh && rm install_verificarlo.sh
 
 # Install protobuf for ONNX
 ARG PROTOBUF=yes
-ADD resources/pytorch/build-deps-installers/install_protobuf.sh install_protobuf.sh
+ADD resources/pytorch_v2.1.0/build-deps-installers/install_protobuf.sh install_protobuf.sh
 RUN if [ -n "${PROTOBUF}" ]; then bash ./install_protobuf.sh; fi
 RUN rm install_protobuf.sh
 ENV INSTALLED_PROTOBUF ${PROTOBUF}
 
 # Install database packages like LMDB and LevelDB
 ARG DB=yes
-ADD resources/pytorch/build-deps-installers/install_db.sh install_db.sh
+ADD resources/pytorch_v2.1.0/build-deps-installers/install_db.sh install_db.sh
 RUN if [ -n "${DB}" ]; then bash ./install_db.sh; fi
 RUN rm install_db.sh
 ENV INSTALLED_DB ${DB}
 
 # Install vision packages like OpenCV and ffmpeg
 ARG VISION=yes
-ADD resources/pytorch/build-deps-installers/install_vision.sh install_vision.sh
+ADD resources/pytorch_v2.1.0/build-deps-installers/install_vision.sh install_vision.sh
 RUN if [ -n "${VISION}" ]; then bash ./install_vision.sh; fi
 RUN rm install_vision.sh
 ENV INSTALLED_VISION ${VISION}
 
 # Install ccache/sccache (do this last, so we get priority in PATH)
-ADD resources/pytorch/build-deps-installers/install_cache.sh install_cache.sh
+ADD resources/pytorch_v2.1.0/build-deps-installers/install_cache.sh install_cache.sh
 ENV PATH /opt/cache/bin:$PATH
 RUN bash ./install_cache.sh && rm install_cache.sh
 
@@ -69,32 +69,33 @@ WORKDIR /var/lib/jenkins/workspace
 RUN git config --global http.postBuffer 524288000  && git clone https://github.com/pytorch/pytorch . && \
     git checkout v2.1.0  && \
     git submodule sync && git submodule update -q --init --recursive
-
+#git checkout 490d41aaa61a9c0b12637e40cec066bf0e9515f3
 
 # Patch build script
-ADD resources/pytorch/build_script_patch_new build_script_patch
+ADD resources/pytorch_v2.1.0/build_script_patch build_script_patch
 RUN git apply build_script_patch
 
 # Disable BLAS
-ADD resources/pytorch/patch_disabling_blas_new patch_disabling_blas
+ADD resources/pytorch_v2.1.0/patch_disabling_blas patch_disabling_blas
 RUN git apply --ignore-space-change patch_disabling_blas
 
 # Setup function instrumentation
-ADD resources/pytorch/script_setting_up_function_instrumentation_new script_setting_up_function_instrumentation
+ADD resources/pytorch_v2.1.0/script_setting_up_function_instrumentation .
 RUN bash script_setting_up_function_instrumentation
 
-# Setup instrumentation of XNNPACK
-ADD resources/pytorch/build-local.sh third_party/XNNPACK/scripts/build-local.sh
+ADD resources/pytorch_v2.1.0/build-local.sh third_party/XNNPACK/scripts/build-local.sh
 
 ENV IN_CIRCLECI=1 \
     BUILD_ENVIRONMENT=pytorch-linux-bionic-py3.8-verificarlo-build
 
 ARG MAX_JOBS=7
 
+COPY	--from=verificarlo/fuzzy:v0.9.1-lapack /usr/local/lib/liblapack.so.3.9.0 /usr/lib/x86_64-linux-gnu/atlas/liblapack.so.3.10.3
+COPY	--from=verificarlo/fuzzy:v0.9.1-lapack /usr/local/lib/libblas.so.3.9.0 /usr/lib/x86_64-linux-gnu/atlas/libblas.so.3.10.3
+
 
 RUN .ci/pytorch/build.sh && \
     find . -type f -name "*.a" -or -name "*.o" -or -name "*.ll" -delete
-
 
 
 # =================================
@@ -103,7 +104,7 @@ RUN .ci/pytorch/build.sh && \
 FROM    ubuntu:20.04
 
 RUN     apt-get update && \
-        apt-get install -y wget vim && \
+        apt-get install -y wget vim libatlas3-base && \
         wget -q "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh" && \
         chmod +x ./Miniconda3-latest-Linux-x86_64.sh && \
         ./Miniconda3-latest-Linux-x86_64.sh -b -f -p "/opt/conda" && \
@@ -125,9 +126,20 @@ COPY    --from=builder \
 COPY    --from=builder \
         /usr/lib/x86_64-linux-gnu/libomp.so.5 /usr/lib/x86_64-linux-gnu/
 
+ARG VERIFICARLO_VERSION=v0.9.1
+
+COPY	--from=verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack /usr/local/lib/liblapack.so.3.9.0 /usr/lib/x86_64-linux-gnu/atlas/liblapack.so.3.10.3
+COPY	--from=verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack /usr/local/lib/libblas.so.3.9.0 /usr/lib/x86_64-linux-gnu/atlas/libblas.so.3.10.3
+COPY	--from=verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack /usr/lib/x86_64-linux-gnu/libflang.so.0d /usr/lib/x86_64-linux-gnu/libflang.so.0d
+COPY	--from=verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack /usr/lib/x86_64-linux-gnu/libflangrti.so.0d /usr/lib/x86_64-linux-gnu/libflangrti.so.0d
+COPY	--from=verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack /usr/lib/x86_64-linux-gnu/libompstub.so.0d /usr/lib/x86_64-linux-gnu/libompstub.so.0d
+COPY	--from=verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack /usr/lib/x86_64-linux-gnu/libpgmath.so.0d /usr/lib/x86_64-linux-gnu/libpgmath.so.0d
+
+
 ENV     VFC_BACKENDS="libinterflop_mca.so"
 
 ADD     resources/test_fuzzy_pytorch.sh .
 #RUN     bash ./test_fuzzy_pytorch.sh && rm test_fuzzy_pytorch.sh
+
 
 CMD ["bash"]

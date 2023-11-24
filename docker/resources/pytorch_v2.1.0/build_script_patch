@@ -1,8 +1,20 @@
 diff --git a/.ci/pytorch/build.sh b/.ci/pytorch/build.sh
-index b53b4675df6..74efb85c579 100755
+index b53b4675df6..83ac99b1042 100755
 --- a/.ci/pytorch/build.sh
 +++ b/.ci/pytorch/build.sh
-@@ -164,6 +164,13 @@ if [[ "${BUILD_ENVIRONMENT}" == *clang* ]]; then
+@@ -5,6 +5,11 @@ set -ex
+ # Required environment variable: $BUILD_ENVIRONMENT
+ # (This is set by default in the Docker images we build, so you don't
+ # need to set it yourself.
++if [[ -n "$IN_CIRCLECI" ]]; then
++  # Download customized sccache
++  sudo curl --retry 3 http://repo.radeon.com/misc/.sccache_amd/sccache -o /opt/cache/bin/sccache
++  sudo chmod 755 /opt/cache/bin/sccache
++fi
+ 
+ # shellcheck source=./common.sh
+ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+@@ -164,6 +169,19 @@ if [[ "${BUILD_ENVIRONMENT}" == *clang* ]]; then
    export CXX=clang++
  fi
  
@@ -10,13 +22,19 @@ index b53b4675df6..74efb85c579 100755
 +  export CC=verificarlo-c
 +  export CXX=verificarlo-c++
 +  export VFC_BACKENDS=libinterflop_ieee.so # So that cmake checks pass
-+fi
++  export USE_MKL=0
++  export USE_MKLDNN=0
++  export BLAS=Generic
++  export NO_MKL=0
++  export USE_SYSTEM_EIGEN_INSTALL=1
++  export CMAKE_PREFIX_PATH=/var/lib/jenkins/workspace/third_party/eigen/cmake/FindEigen3.cmake
 +
++fi
 +
  if [[ "$BUILD_ENVIRONMENT" == *-clang*-asan* ]]; then
    export LDSHARED="clang --shared"
    export USE_CUDA=0
-@@ -220,7 +227,8 @@ else
+@@ -220,7 +238,8 @@ else
      # set only when building other architectures
      # or building non-XLA tests.
      if [[ "$BUILD_ENVIRONMENT" != *rocm*  &&
@@ -27,7 +45,7 @@ index b53b4675df6..74efb85c579 100755
      else
        python setup.py bdist_wheel
 diff --git a/.ci/pytorch/common_utils.sh b/.ci/pytorch/common_utils.sh
-index 7894c14b254..e008b0f618e 100644
+index 7894c14b254..7902d9a7c29 100644
 --- a/.ci/pytorch/common_utils.sh
 +++ b/.ci/pytorch/common_utils.sh
 @@ -42,7 +42,7 @@ declare -f -t trap_add
@@ -40,15 +58,17 @@ index 7894c14b254..e008b0f618e 100644
          if [[ $git_status ]]; then
              echo "Build left local git repository checkout dirty"
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3a48eaf4e29..2c9d94763ab 100644
+index 3a48eaf4e29..b30ee47c2b1 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -29,6 +29,8 @@ else()
+@@ -29,6 +29,10 @@ else()
  endif()
  
  set(CMAKE_INSTALL_MESSAGE NEVER)
 +set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
 +set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
++set(BLAS_LIBRARIES "/usr/lib/x86_64-linux-gnu/libblas.so")
++set(LAPACK_LIBRARIES "/usr/lib/x86_64-linux-gnu/liblapack.so")
  
  # check and set CMAKE_CXX_STANDARD
  string(FIND "${CMAKE_CXX_FLAGS}" "-std=c++" env_cxx_standard)
