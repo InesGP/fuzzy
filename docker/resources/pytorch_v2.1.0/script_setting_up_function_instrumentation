@@ -6,6 +6,6 @@ EOF
 cat << 'EOF' | sudo tee /usr/local/bin/verificarlo-c++ >> /dev/null
 #!/bin/bash
 
-verificarlo --linker=clang++ -Qunused-arguments -- ${@}
+verificarlo --linker=clang++ -Qunused-arguments ${@}
 EOF
 

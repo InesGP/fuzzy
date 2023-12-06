@@ -1,3 +1,9 @@
+ARG VERIFICARLO_VERSION=v0.9.1
+FROM verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack-python3.8.5 as fuzzy_python
+
+#ARG VERIFICARLO_VERSION=v0.9.1
+FROM verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack as lapack
+
 FROM ubuntu:20.04 AS builder
 
 # Used by install scripts
@@ -27,7 +33,7 @@ RUN bash ./install_conda.sh && rm install_conda.sh
 
 # Install Verificarlo
 ARG VERIFICARLO_VERSION=github
-ADD resources/pytorch_v2.1.0/build-deps-installers/install_verificarlo2.sh install_verificarlo.sh
+ADD resources/pytorch_v2.1.0/build-deps-installers/install_verificarlo.sh install_verificarlo.sh
 RUN bash ./install_verificarlo.sh && rm install_verificarlo.sh
 
 # Install protobuf for ONNX
@@ -108,7 +114,7 @@ RUN     apt-get update && \
         wget -q "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh" && \
         chmod +x ./Miniconda3-latest-Linux-x86_64.sh && \
         ./Miniconda3-latest-Linux-x86_64.sh -b -f -p "/opt/conda" && \
-        /opt/conda/bin/conda install -y python="3.8" typing_extensions sympy numpy=1.24 pyyaml mkl mkl-include setuptools \
+        /opt/conda/bin/conda install -y python="3.8" torchvision onnx2torch typing_extensions sympy numpy=1.24 pyyaml mkl mkl-include setuptools \
                                         cffi typing typing_extensions future six dataclasses && \
         rm -rf /var/lib/apt/lists/* Miniconda3-latest-Linux-x86_64.sh
         #upgrade numpy from 1.18.5
@@ -126,19 +132,20 @@ COPY    --from=builder \
 COPY    --from=builder \
         /usr/lib/x86_64-linux-gnu/libomp.so.5 /usr/lib/x86_64-linux-gnu/
 
-ARG VERIFICARLO_VERSION=v0.9.1
 
-COPY	--from=verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack /usr/local/lib/liblapack.so.3.9.0 /usr/lib/x86_64-linux-gnu/atlas/liblapack.so.3.10.3
-COPY	--from=verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack /usr/local/lib/libblas.so.3.9.0 /usr/lib/x86_64-linux-gnu/atlas/libblas.so.3.10.3
-COPY	--from=verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack /usr/lib/x86_64-linux-gnu/libflang.so.0d /usr/lib/x86_64-linux-gnu/libflang.so.0d
-COPY	--from=verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack /usr/lib/x86_64-linux-gnu/libflangrti.so.0d /usr/lib/x86_64-linux-gnu/libflangrti.so.0d
-COPY	--from=verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack /usr/lib/x86_64-linux-gnu/libompstub.so.0d /usr/lib/x86_64-linux-gnu/libompstub.so.0d
-COPY	--from=verificarlo/fuzzy:${VERIFICARLO_VERSION}-lapack /usr/lib/x86_64-linux-gnu/libpgmath.so.0d /usr/lib/x86_64-linux-gnu/libpgmath.so.0d
 
+COPY	--from=lapack /usr/local/lib/liblapack.so.3.9.0 /usr/lib/x86_64-linux-gnu/atlas/liblapack.so.3.10.3
+COPY	--from=lapack /usr/local/lib/libblas.so.3.9.0 /usr/lib/x86_64-linux-gnu/atlas/libblas.so.3.10.3
+COPY	--from=lapack /usr/lib/x86_64-linux-gnu/libflang.so.0d /usr/lib/x86_64-linux-gnu/libflang.so.0d
+COPY	--from=lapack /usr/lib/x86_64-linux-gnu/libflangrti.so.0d /usr/lib/x86_64-linux-gnu/libflangrti.so.0d
+COPY	--from=lapack /usr/lib/x86_64-linux-gnu/libompstub.so.0d /usr/lib/x86_64-linux-gnu/libompstub.so.0d
+COPY	--from=lapack /usr/lib/x86_64-linux-gnu/libpgmath.so.0d /usr/lib/x86_64-linux-gnu/libpgmath.so.0d
+
+COPY	--from=fuzzy_python /usr/local/bin/python3* /opt/conda/bin/.
 
 ENV     VFC_BACKENDS="libinterflop_mca.so"
 
-ADD     resources/test_fuzzy_pytorch.sh .
+ADD     resources/pytorch_v2.1.0/test_fuzzy_pytorch.sh .
 #RUN     bash ./test_fuzzy_pytorch.sh && rm test_fuzzy_pytorch.sh
 
 
